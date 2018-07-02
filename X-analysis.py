@@ -15,12 +15,13 @@
 #Analysis of a bonding process A + B --> C:  
 # ./X-analysis.py QM-outputfile_A QM-outputfile_B QM-outputfile_C 
 
-# QM-outputfiles can be in different directories 
+#OPTIONS:
 # If core-valence separation is desired add the flag --core
+# To specify stochiometry X and Y in XA --> 1B or XA + YB --> 1AB add the flag --stoch
 
 # Written by Martin Rahm, Chalmers University of Technology 
 #MIT License
-#Copyright (c) [2017] [Martin Rahm]
+#Copyright (c) [2018] [Martin Rahm]
 
 #Permission is hereby granted, free of charge, to any person obtaining a copy
 #of this software and associated documentation files (the "Software"), to deal
@@ -51,7 +52,7 @@ print('')
 print('!        Average Binding Energy (X-bar)         !')
 print('!       and Energy Decomposition Analysis       !')
 print('!       all energies in electron volt (eV)      !')
-print('!             Revision Dec 19, 2017             !')
+print('!             Revision Jun 29, 2018             !')
 print('')
 
 import cclib
@@ -222,7 +223,7 @@ def Xanalysis(inputfile,core): #Main program code, does analysis on one QM outpu
         if core == 0: #If no core exists (e.g. for hydrogen), the valence is also shown as core
             average_core = average_val
         else:
-            average_core = sum_core / core   
+            average_core = sum_core / core
         average_tot = sum_tot / total
 
     else: #Both unrestricted and restricted count per electron, so *2 here. 
@@ -244,8 +245,8 @@ def Xanalysis(inputfile,core): #Main program code, does analysis on one QM outpu
     print("E = n*X-bar + Vnn + Eee")    
     print("Total SCF energy (E):                                   ", Etot[-1]) #print last energy
     if core != 0:
-        print("Total energy of valence electrons (n*X-bar_valence):    ", electrons*average_val)
-        print("Total energy of core orbitals (n*X-bar_core):           ", electrons*average_core)
+        print("Total energy of valence electrons (n*X-bar_valence):    ", (electrons-core)*average_val)
+        print("Total energy of core orbitals (n*X-bar_core):           ", core*average_core)
     print("Total energy of occupied orbitals (n*X-bar):            ", electrons*average_tot) 
 
     steps = data.atomcoords.shape[0]-1 #Determines number of optimization steps
@@ -270,28 +271,28 @@ def Xanalysis(inputfile,core): #Main program code, does analysis on one QM outpu
 
     if open_shell==True:
         W = Etot[-1] - total*average_tot-VNN
-        print("Multi-electron term (Eee):                              ", W)
+        print("Multi-electron term (Eee):                              ", -W) # Eee = -W
 
     if open_shell==False:
         W = Etot[-1] - total*average_tot-VNN
-        print("Multi-electron term (Eee):                              ", W)
-    print("Vnn + Eee:                                              ", (VNN+W))
+        print("Multi-electron term (Eee):                              ", -W)
+    print("Vnn - Eee:                                              ", (VNN+W))
 
     print("")
     print("----TOTAL ENERGIES PER ELECTRON-------")
-    print("E/n = X-bar + (Vnn + Eee)/n")    
+    print("E/n = X-bar + (Vnn - Eee)/n")    
     print("E/n:             ", Etot[-1]/electrons) #print last energy  
     if core != 0:
         print("X-bar_valence:   ", average_val)
         print("X-bar_core:      ", average_core)
     print("X-bar:           ", average_tot)
     print("Vnn/n:           ", VNN/electrons)
-    print("Eee/n:           ", W/electrons)
-    print("(Vnn + Eee)/n:   ", (VNN/electrons+W/electrons))
+    print("Eee/n:           ", -W/electrons)
+    print("(Vnn - Eee)/n:   ", (VNN/electrons+W/electrons))
 
     print("")
     print("-------MULTIELECTRON ANALYSIS----------")
-    print("100*(Eee/Etot):  ",format((W/Etot[-1])*100,'.2f') + " %") #prints the Eee-percentage with two decimal points  
+    print("100*(|Eee/Etot|):  ",format((W/Etot[-1])*100,'.2f') + " %") #prints the Eee-percentage with two decimal points  
 
     E = Etot[-1]
     En = Etot[-1]/electrons
@@ -325,63 +326,78 @@ if (len(inputfile) == 2) or (len(inputfile) == 3) and (("--core" in inputfile)):
     results=Xanalysis(file1,core)
 
 #Analysis of a step A-->B, where A and B are isomers 
-if ((len(inputfile) == 3 ) and ("--core" not in inputfile)) or (len(inputfile) == 4) and (("--core" in inputfile)):
-    STEPCALC = True 
+if ((len(inputfile) == 3 ) and ("--core" not in inputfile)) or ((len(inputfile) == 4) and ("--core" in inputfile)) or ((len(inputfile) == 4) and ("--stoch" in inputfile)) or ((len(inputfile) == 5) and ("--core" in inputfile) and ("--stoch" in inputfile)):
+    STEPCALC = True
+    stoch = 1.0 #stoch is stochiometry of A, e.g. 2A --> B. Default is 1. 
     print("* "+"{0}".format(inputfile[1]) + " --> " + "{0}".format(inputfile[2]) + " *")
     file1=inputfile[1]
     file2=inputfile[2]
     if "--core" in inputfile:
-        core = eval(input ("Please enter number of core electrons (0 = all electrons included): "))
+        core = eval(input ("Please enter number of core electrons in " + file1 + " (0 = all electrons included): "))
         valencesplit = True 
     else:
         core = 0
+    if "--stoch" in inputfile:
+        stoch = eval(input ("Please enter the stochiometry of " + file1 + " (1 is default): "))
+        
     sys.stdout = nullwrite # disable output 
     results1=Xanalysis(file1,core)
-    results2=Xanalysis(file2,core)
+    results2=Xanalysis(file2,core*stoch)
     sys.stdout = oldstdout # enable output 
 
+    print(results1[0], results2[1])
+
     dX = results2[2] - results1[2]
-    dE = results2[3] - results1[3]
+    dE = results2[3] - stoch*results1[3]
     dVnn = results2[5] - results1[5]
     Q = ((2*results2[8]*dX)/dE)-1
     dEee = results2[6] - results1[6]
     dEeeVnnn = results2[7] - results1[7]
 
-    print("E/n = X-bar + (Vnn + Eee)/n")    
+    print("E/n = X-bar + (Vnn - Eee)/n")    
     print("-------------------------------------------------")
     print("Electrons (n):           " , results2[8] )
     print("Delta(E):                " , format(dE,'.3f') + " eV")
     print("Delta(E/n):              " , format(dE/results2[8],'.3f') + " eV/e")
     print("Delta(X-bar):            " , format(dX,'.3f') + " eV/e")
     print("Delta(Vnn/n):            " , format(dVnn,'.3f') + " eV/e")
-    print("Delta(Eee/n):            " , format(dEee,'.3f') + " eV/e")
-    print("Delta(Eee-Vnn)/n:        " , format(dEeeVnnn,'.3f') + " eV/e")
+    print("Delta(Eee/n):            " , format(-dEee,'.3f') + " eV/e")
+    print("Delta(Vnn-Eee)/n:        " , format(dEeeVnnn,'.3f') + " eV/e")
     print("Q:                       " , format(Q,'.3f') )
-    print("Delta(Eee/E)             " , format(((dEee/dE)*100),'.2f') + " %")
+    print("Delta(|Eee/E|)           " , format(((dEee/dE)*100),'.2f') + " %")
     if valencesplit == True:
+        print(results2[0])
+        print(results1[0])
         dXcore = results2[0] - results1[0]
         dXval = results2[1] - results1[1]
-        dXapprox = (dXval*(results2[8]-core))/results2[8]
+        dXapprox = (dXval*(results2[8]-core*stoch))/results2[8]
         print("Delta(X-bar)_valence:    " , format(dXval,'.3f') + " eV/e")
         print("Delta(X-bar)_core:       " , format(dXcore,'.3f') + " eV/e")
         print("Delta(X-bar)_val-approx: " , format(dXapprox,'.3f') + " eV/e")
 
 #Analysis of bond formation, A + B --> AB
-if ((len(inputfile) == 4 ) and ("--core" not in inputfile)) or (len(inputfile) == 5) and (("--core" in inputfile)):
+if ((len(inputfile) == 4 ) and ("--core" not in inputfile) and ("--stoch" not in inputfile)) or ((len(inputfile) == 5) and ("--core" in inputfile) and ("--stoch" not in inputfile)) or ((len(inputfile) == 5) and ("--core" not in inputfile) and ("--stoch" in inputfile)) or ((len(inputfile) == 6) and ("--core" in inputfile) and ("--stoch" in inputfile)):
     BONDCALC = True 
     print("* "+"{0}".format(inputfile[1]) + " + " + "{0}".format(inputfile[2]) + " --> " +  "{0}".format(inputfile[3]) + " *")
     file1=inputfile[1]
     file2=inputfile[2]
     file3=inputfile[3]
+    stoch1=1.0
+    stoch2=1.0
     if "--core" in inputfile:
         core1 = eval(input ("Please enter number of core electrons in " + file1 + " (0 = all electrons included): "))
         core2 = eval(input ("Please enter number of core electrons in " + file2 + " (0 = all electrons included): "))
-        core3 = core1 + core2 
         valencesplit = True 
     else:
         core1 = 0
         core2 = 0
-        core3 = 0
+    if "--stoch" in inputfile:
+        stoch1 = eval(input ("Please enter the stochiometry of " + file1 + " (1 is default): "))
+    if "--stoch" in inputfile:
+        stoch2 = eval(input ("Please enter the stochiometry of " + file2 + " (1 is default): "))
+
+    core3 = core1*stoch1 + core2*stoch2 
+
     sys.stdout = nullwrite # disable output  
     results1=Xanalysis(file1,core1)
     results2=Xanalysis(file2,core2)
@@ -390,27 +406,27 @@ if ((len(inputfile) == 4 ) and ("--core" not in inputfile)) or (len(inputfile) =
     
     #results(average_core, average_val, average_tot, E, En, Vnnn, Wn, WnVnnn, electrons)    
  
-    dX = results3[2] - ((results1[8]*results1[2] + results2[8]*results2[2])/(results1[8]+results2[8]))
-    dE = results3[3] - (results1[3]+results2[3])
-    dVnn = results3[5] - ((results1[8]*results1[5] + results2[8]*results2[5])/(results1[8]+results2[8]))
+    dX = results3[2] - ((stoch1*results1[8]*results1[2] + stoch2*results2[8]*results2[2])/results3[8])
+    dE = results3[3] - (stoch1*results1[3]+stoch2*results2[3])
+    dVnn = results3[5] - ((results1[8]*results1[5] + results2[8]*results2[5])/results3[8])
     Q = ((2*results3[8]*dX)/dE)-1
-    dEee = results3[6] - ((results1[8]*results1[6] + results2[8]*results2[6])/(results1[8]+results2[8])) 
-    dEeeVnnn = results3[7] - ((results1[8]*results1[7] + results2[8]*results2[7])/(results1[8]+results2[8]))
+    dEee = results3[6] - ((stoch1*results1[8]*results1[6] + stoch2*results2[8]*results2[6])/results3[8]) 
+    dEeeVnnn = results3[7] - ((stoch1*results1[8]*results1[7] + stoch2*results2[8]*results2[7])/results3[8])
 
-    print("E/n = X-bar + (Vnn + Eee)/n")    
+    print("E/n = X-bar + (Vnn - Eee)/n")    
     print("-------------------------------------------------")
     print("Electrons (n):           " , results3[8] )
     print("Delta(E):                " , format(dE,'.3f') + " eV")
     print("Delta(E/n):              " , format(dE/results3[8],'.3f') + " eV/e")
     print("Delta(X-bar):            " , format(dX,'.3f') + " eV/e")
     print("Delta(Vnn/n):            " , format(dVnn,'.3f') + " eV/e")
-    print("Delta(Eee/n):            " , format(dEee,'.3f') + " eV/e")
-    print("Delta(Eee-Vnn)/n:        " , format(dEeeVnnn,'.3f') + " eV/e")
+    print("Delta(Eee/n):            " , format(-dEee,'.3f') + " eV/e")
+    print("Delta(Vnn-Eee)/n:        " , format(dEeeVnnn,'.3f') + " eV/e")
     print("Q:                       " , format(Q,'.3f') )
-    print("Delta(Eee/E)             " , format(((dEee/dE)*100),'.2f') + " %")
+    print("Delta(|Eee/E|)           " , format(((dEee/dE)*100),'.2f') + " %")
     if valencesplit == True:
-        dXcore = results3[0] - ((core1*results1[0] + core2*results2[0])/(core1 + core2))
-        dXval = results3[1] - (((results1[8]-core1)*results1[1] + (results2[8]-core2)*results2[1])/(results1[8]+results2[8] - core1 - core2))
+        dXcore = results3[0] - ((stoch1*core1*results1[0] + stoch2*core2*results2[0])/core3)
+        dXval = results3[1] - (((results1[8]-core1)*stoch1*results1[1] + (results2[8]-core2)*stoch2*results2[1])/(results3[8] - core3))
         dXapprox = (dXval*(results3[8]-core3))/results3[8]
         print("Delta(X-bar)_valence:    " , format(dXval,'.3f') + " eV/e")
         print("Delta(X-bar)_core:       " , format(dXcore,'.3f') + " eV/e")
