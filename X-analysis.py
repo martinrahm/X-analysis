@@ -48,11 +48,17 @@
 # and for cclib:
 # N. M. O'Boyle, A. L. Tenderholt, K. M. Langner, J. Comput. Chem. 29, 839-845, 2008
 
+#The most recent version of the code is accessible through a link at https://rahmlab.com/energy-decomposition-analysis/ 
+
 print('')
-print('!        Average Binding Energy (X-bar)         !')
-print('!       and Energy Decomposition Analysis       !')
-print('!       all energies in electron volt (eV)      !')
-print('!             Revision Jun 29, 2018             !')
+print('>  EQC ENERGY DECOMPOSITION ANALYSIS ')
+print('>  Energies in electron volt (eV)   ')
+print('>  Revision Jul 20, 2018            ')
+print('')
+print('>  Citation is greatfully appreciated:           ')
+print('>  https://rahmlab.com/energy-decomposition-analysis/ ')
+print('>  M. Rahm, R. Hoffmann, J. Am. Chem. Soc, 137, 10282-10291, 2015')
+print('>  M. Rahm, R. Hoffmann, J. Am. Chem. Soc, 138, 3731-3744, 2016')
 print('')
 
 import cclib
@@ -68,7 +74,10 @@ def Xanalysis(inputfile,core): #Main program code, does analysis on one QM outpu
     lines = fo.readlines()
     fo.close()
 
-    core=int(core/2) # translates electrons to orbtials
+    if core % 2 != 0:
+        print("WARNING! Only even number of core electrons are supported. Core averaging will be incorrect!")
+    core=int(core/2) # translates number of electrons to number of orbitals
+
     replace=False   
     for line in lines:
         if "**********-" in line:
@@ -224,6 +233,7 @@ def Xanalysis(inputfile,core): #Main program code, does analysis on one QM outpu
             average_core = average_val
         else:
             average_core = sum_core / core
+
         average_tot = sum_tot / total
 
     else: #Both unrestricted and restricted count per electron, so *2 here. 
@@ -320,7 +330,7 @@ if (len(inputfile) == 2) or (len(inputfile) == 3) and (("--core" in inputfile)):
     file1=inputfile[1]
     if "--core" in inputfile:
         core = eval(input ("Please enter number of core electrons in " + file1 + " (0 = all electrons included): "))
-        valencesplit = True 
+        valencesplit = True
     else:
         core = 0
     results=Xanalysis(file1,core)
@@ -335,6 +345,8 @@ if ((len(inputfile) == 3 ) and ("--core" not in inputfile)) or ((len(inputfile) 
     if "--core" in inputfile:
         core = eval(input ("Please enter number of core electrons in " + file1 + " (0 = all electrons included): "))
         valencesplit = True 
+        if core % 2 != 0:
+            print("WARNING! Only even number of core electrons are supported. Core averaging will be incorrect!")
     else:
         core = 0
     if "--stoch" in inputfile:
@@ -353,6 +365,7 @@ if ((len(inputfile) == 3 ) and ("--core" not in inputfile)) or ((len(inputfile) 
     Q = ((2*results2[8]*dX)/dE)-1
     dEee = results2[6] - results1[6]
     dEeeVnnn = results2[7] - results1[7]
+    Covalency = (100*(abs(dX)-dX)/2)*(1/(abs(dEeeVnnn)-dX)) + (100*(abs(dX)+dX)/2)*(1/(dEeeVnnn-dX)+1/dX)  #from SI of JACS,137,10282-10291,2015. 
 
     print("E/n = X-bar + (Vnn - Eee)/n")    
     print("-------------------------------------------------")
@@ -374,6 +387,8 @@ if ((len(inputfile) == 3 ) and ("--core" not in inputfile)) or ((len(inputfile) 
         print("Delta(X-bar)_valence:    " , format(dXval,'.3f') + " eV/e")
         print("Delta(X-bar)_core:       " , format(dXcore,'.3f') + " eV/e")
         print("Delta(X-bar)_val-approx: " , format(dXapprox,'.3f') + " eV/e")
+    print("Covalency Index:         " , format(Covalency,'.1f') + " %")
+    print("Ionicity Index:          " , format(100-Covalency,'.1f') + " %")
 
 #Analysis of bond formation, A + B --> AB
 if ((len(inputfile) == 4 ) and ("--core" not in inputfile) and ("--stoch" not in inputfile)) or ((len(inputfile) == 5) and ("--core" in inputfile) and ("--stoch" not in inputfile)) or ((len(inputfile) == 5) and ("--core" not in inputfile) and ("--stoch" in inputfile)) or ((len(inputfile) == 6) and ("--core" in inputfile) and ("--stoch" in inputfile)):
@@ -397,6 +412,8 @@ if ((len(inputfile) == 4 ) and ("--core" not in inputfile) and ("--stoch" not in
         stoch2 = eval(input ("Please enter the stochiometry of " + file2 + " (1 is default): "))
 
     core3 = core1*stoch1 + core2*stoch2 
+    if core3 % 2 != 0:
+        print("WARNING! Only even number of core electrons are supported. Core averaging will be incorrect!")
 
     sys.stdout = nullwrite # disable output  
     results1=Xanalysis(file1,core1)
@@ -412,7 +429,11 @@ if ((len(inputfile) == 4 ) and ("--core" not in inputfile) and ("--stoch" not in
     Q = ((2*results3[8]*dX)/dE)-1
     dEee = results3[6] - ((stoch1*results1[8]*results1[6] + stoch2*results2[8]*results2[6])/results3[8]) 
     dEeeVnnn = results3[7] - ((stoch1*results1[8]*results1[7] + stoch2*results2[8]*results2[7])/results3[8])
+    Covalency = (100*(abs(dX)-dX)/2)*(1/(abs(dEeeVnnn)-dX)) + (100*(abs(dX)+dX)/2)*(1/(dEeeVnnn-dX)+1/dX)  #from SI of JACS,137,10282-10291,2015. 
 
+#    print (abs*)
+ 
+    print
     print("E/n = X-bar + (Vnn - Eee)/n")    
     print("-------------------------------------------------")
     print("Electrons (n):           " , results3[8] )
@@ -431,7 +452,8 @@ if ((len(inputfile) == 4 ) and ("--core" not in inputfile) and ("--stoch" not in
         print("Delta(X-bar)_valence:    " , format(dXval,'.3f') + " eV/e")
         print("Delta(X-bar)_core:       " , format(dXcore,'.3f') + " eV/e")
         print("Delta(X-bar)_val-approx: " , format(dXapprox,'.3f') + " eV/e")
-
+    print("Covalency Index:         " , format(Covalency,'.1f') + " %")
+    print("Ionicity Index:          " , format(100-Covalency,'.1f') + " %")
 
 
 
