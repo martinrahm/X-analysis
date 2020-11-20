@@ -1,2 +1,2 @@
 # X-analysis
- Average Binding Energy and Energy Decomposition Analysis 
+python script for performing the EQC Energy Decomposition Analysis 
